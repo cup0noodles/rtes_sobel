@@ -3,8 +3,8 @@
 # 
 
 CC = g++
-LIBS = -lpcap
-CFLAGS = -g -Wall -Iinc/ -I/usr/include/opencv4/ `pkg-config --libs opencv4`
+LIBS = -lpcap -lpthread
+CFLAGS = -g -Wall -o0 -Iinc/ -I/usr/include/opencv4/ `pkg-config --libs opencv4`
 SRCS = $(wildcard src/*.cpp)
 #CFLAGS = -g
 

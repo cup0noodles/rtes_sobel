@@ -15,8 +15,8 @@ using namespace cv;
 #ifndef SOBEL_HEADER_H
 #define SOBEL_HEADER_H
 
-Mat to442_grayscale(Mat rbg_frame);
+Mat to442_grayscale(Mat rgb_frame, int i=0, int n=1);
 
-Mat to442_sobel(Mat frame);
+Mat to442_sobel(Mat frame, int i=0, int n=1);
 
 #endif

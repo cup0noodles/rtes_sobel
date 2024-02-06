@@ -8,16 +8,23 @@
  * Video Demo: https://youtu.be/28PkBCEMIcQ
 *********************************************/
 #include "sobel.hpp"
+#include "math.h"
 
-Mat to442_grayscale(Mat rgb_frame)
+Mat to442_grayscale(Mat rgb_frame, int i, int n)
 {
     int rows = rgb_frame.rows;
     int cols = rgb_frame.cols;
+    // going to split bounds vertically (along cols)
+    // generally video is wide format, going to use 16 threads tops, 4 on a pi
+    // minimzes length of pixels that are going to be recomputed
+    int col_range = (cols/n);
+    int col_start = max((col_range*i)-1, 0);
+    int col_end = min(col_range*(i+1)+1,col_range);
 
     Mat graymat(rows, cols, CV_8U, Scalar(0));
     for(int r=0;r<rows-1;r++)
     {
-        for(int c=0;c<cols-1;c++)
+        for(int c=col_start;c<col_end-1;c++)
         {
             unsigned char *p_rgb = rgb_frame.ptr(r, c); //BRG format
             unsigned char *p_gray = graymat.ptr(r, c);
@@ -27,10 +34,15 @@ Mat to442_grayscale(Mat rgb_frame)
     return graymat;
 }
 
-Mat to442_sobel(Mat frame)
+Mat to442_sobel(Mat frame, int i, int n)
 {
     int rows = frame.rows;
     int cols = frame.cols;
+
+    int col_range = (cols/n);
+    int col_start = max((col_range*i)-1, 0);
+    int col_end = min(col_range*(i+1)+1,col_range);
+
     Mat sobel_frame(rows, cols, CV_8U, Scalar(0));
     // init 0 so no issues with edges
 
@@ -41,7 +53,7 @@ Mat to442_sobel(Mat frame)
     //      +|(P3 + 2*P6 + P9) - (P1 + 2*P4 + P7)|
     for(int r=1;r<rows-2;r++)
     {
-        for(int c=1;c<cols-2;c++)
+        for(int c=col_start+1;c<col_end-2;c++)
         {
             unsigned char p[9];
             // build matrix of surrounding pixels
