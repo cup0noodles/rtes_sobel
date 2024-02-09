@@ -31,7 +31,7 @@ int main(int argc, char** argv)
     }
     // allocate image matrix
     Mat allocated_frame; //input matrix
-    Mat tout[thread_count]; //thread output matrix
+    Mat output_frame; //thread output matrix
 
     pthread_t thread[thread_count+1];
     int ret_val[thread_count+1];
@@ -50,20 +50,20 @@ int main(int argc, char** argv)
             struct displayArgs da = 
             {
                 .n=thread_count,
-                .tout=tout,
                 .allocated_frame=&allocated_frame,
+                .output_frame=&output_frame,
                 .cap=&cap
             };
             ret_val[i] = pthread_create(&thread[i], NULL, displayThread, (void *)&da);
         }
-        else
+        else if(i < thread_count)
         {
             struct sobelArgs sa = 
             {
                 .i=i,
                 .n=thread_count,
                 .allocated_frame=&allocated_frame,
-                .tout=&tout[i]
+                .output_frame=&output_frame
             };
             ret_val[i] = pthread_create(&thread[i], NULL, sobelThread, (void *)&sa);
         }
@@ -95,15 +95,34 @@ void* sobelThread(void *sobelArgs)
     //display thread will recombine the final output
     //will not be recombining at grayscale, just take the performance hit of pixel overlap
     //is more significant at higher thread counts potentially but fine here
-    printf("TH%i: entered\n",tn);
+    printf("TH%u: entered\n",tn);
+    //generate mask
+    int itr = 0;
     while(1)
     {
         //wait for global to allocate
-        printf("TH%i: waiting for img allocate\n",tn);
+        //printf("TH%u: waiting for img allocate\n",tn);
         pthread_barrier_wait(&allocatebarrier);
         //grab frame from allocated_frame
 
         Mat frame = *sa->allocated_frame;
+        Mat emask;
+        if (itr == 0)
+        {
+            int rows = frame.rows;
+            int cols = frame.cols;
+            int col_range = (cols/sa->n);
+            emask = Mat(rows, cols, CV_8U, Scalar(0));
+            int col_start = max((col_range*tn), 0);
+            int col_end = min((col_range*(tn+1)),cols);
+            for(int r=0;r<rows-1;r++)
+            { 
+                for(int c=col_start;c<col_end-1;c++)
+                {
+                    *emask.ptr(r,c) = 255;
+                }
+            }
+        }
         //exit if empty frame
         if (frame.empty())
         {
@@ -114,11 +133,14 @@ void* sobelThread(void *sobelArgs)
         Mat gs = to442_grayscale(frame,sa->i,sa->n);
         //process sobel
         Mat sob = to442_sobel(gs, sa->i, sa->n);
-        printf("TH%i: waiting for display\n",tn);
+        // printf("TH%i: waiting for display\n",tn);
         pthread_barrier_wait(&displaybarrier);
         //wait for previous frame to be output before copying
-        *sa->tout = sob;
+        pthread_mutex_lock(&mutex);
+        add(sob,*sa->output_frame,*sa->output_frame, emask);
+        pthread_mutex_unlock(&mutex);
         //loop
+        itr += 1;
     }
 }
 
@@ -126,55 +148,45 @@ void* displayThread(void *displayArgs)
 {
     struct displayArgs* da = (struct displayArgs*)displayArgs;
     int itr = 0;
-    int col_range, col_start, col_end;
+    int cols, rows;
     Mat masks[da->n];
     while(1)
     {
     //allocate frame
     *da->cap >> *da->allocated_frame;
     printf("DIS: Allocating...\n");
+
+    //alocate empty output
+
     pthread_barrier_wait(&allocatebarrier); //wait for all frames to be ready to grab
     //exit if empty frame
     if((*da->allocated_frame).empty()) return 0;
     
     if(itr == 0)
     {
-        printf("DIS: Initializing Masks...\n");
-        int cols = (*da->allocated_frame).cols;
-        int rows = (*da->allocated_frame).rows;
-        //define bounds
-        col_range = (cols/da->n);
-
-        for(int i=0;i<da->n;i++)
-        { //per thread
-            Mat emask(rows, cols, CV_8U, Scalar(0));    
-            col_start = max((col_range*i)-1, 0);
-            col_end = min(col_range*(i+1)+1,col_range);
-            for(int r=0;r<rows-1;r++)
-            { 
-                for(int c=col_start;c<col_end-1;c++)
-                {
-                    *emask.ptr(r,c) = 255;
-                }
-            }
-            masks[i] = emask.clone();
-        }
+        // printf("DIS: Initializing Masks...\n");
+        cols = (*da->allocated_frame).cols;
+        rows = (*da->allocated_frame).rows;
+        Mat newout (rows, cols, CV_8U, Scalar(0));
+        newout.copyTo(*da->output_frame);
+        (*da->output_frame) = Scalar(0);
         pthread_barrier_wait(&displaybarrier);
-        
     }
     if (itr != 0)
     {
         //skip if frame 0
         //wait for frames to be done with sobel
         //copy and recombine previous sobel images
-        Mat sout;
-        for(int i=0;i<da->n;i++)
-        {
-            da->tout[i].copyTo(sout, masks[i]);
-        }
+        Mat sout(rows, cols, CV_8U, Scalar(0));;
+
+        pthread_mutex_lock(&mutex);
+        (*da->output_frame).copyTo(sout);
+        pthread_mutex_unlock(&mutex);
+
         imshow("Sobel Output",sout);
-        waitKey(1);
-        printf("DIS: Waiting on display\n");
+        waitKey(0);
+        (*da->output_frame) = Scalar(0);
+        // printf("DIS: Waiting on display\n");
         pthread_barrier_wait(&displaybarrier);
         //diplay sobel image
     }

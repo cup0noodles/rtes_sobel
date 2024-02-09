@@ -18,20 +18,21 @@ using namespace cv;
 
 //define globals
 pthread_barrier_t allocatebarrier, displaybarrier; //common barrier used to gather all sobel threads
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct sobelArgs 
 {
     int i; //thread number
     int n; //thread count
     Mat* allocated_frame;
-    Mat* tout;
+    Mat* output_frame;
 };
 
 struct displayArgs
 {
     int n; //thread count
-    Mat* tout;
     Mat* allocated_frame;
+    Mat* output_frame;
     VideoCapture* cap;
 
 };
