@@ -10,6 +10,7 @@
 #include <opencv2/opencv.hpp>
 #include <pthread.h>
 #include <math.h>
+#include <time.h>
 
 #ifndef _IMGVIEW_HEADER_HPP
 #define _IMGVIEW_HEADER_HPP
@@ -34,6 +35,7 @@ struct displayArgs
     Mat* allocated_frame;
     Mat* output_frame;
     VideoCapture* cap;
+    int debug_code;
 
 };
 

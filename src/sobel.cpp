@@ -19,7 +19,7 @@ Mat to442_grayscale(Mat rgb_frame, int i, int n)
     // minimzes length of pixels that are going to be recomputed
     int col_range = (cols/n);
     int col_start = max((col_range*i)-1, 0);
-    int col_end = min(col_range*(i+1)+1,cols);
+    int col_end = min(col_range*(i+1)+2,cols);
 
     Mat graymat(rows, cols, CV_8U, Scalar(0));
     for(int r=0;r<rows-1;r++)
@@ -41,7 +41,7 @@ Mat to442_sobel(Mat frame, int i, int n)
 
     int col_range = (cols/n);
     int col_start = max((col_range*i)-1, 0);
-    int col_end = min(col_range*(i+1)+1,cols);
+    int col_end = min(col_range*(i+1)+2,cols);
 
     Mat sobel_frame(rows, cols, CV_8U, Scalar(0));
     // init 0 so no issues with edges

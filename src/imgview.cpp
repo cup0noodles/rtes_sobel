@@ -18,6 +18,9 @@
  *  Lab 4
  *  Added variable multithreading support with
  *  shared memory
+ *  Note: Limiting factor here is X11. Will need
+ *  to switch to better performance measure that
+ *  is not dependant on X11.
  *  Video Demo: 
 *********************************************/
 #include "imgview.hpp"
@@ -27,6 +30,16 @@ int main(int argc, char** argv)
 {
     String file_path = argv[1];
     int thread_count = atoi(argv[2]); //count of worker threads
+    int debug_code = 0;
+    if (argc == 4)
+    {
+        debug_code = atoi(argv[3]);
+    }
+    clock_t ts, te;
+    if (debug_code == 1)
+    {
+        ts = clock();
+    }
     
     VideoCapture cap(file_path); 
     //check that video was actually opened
@@ -40,7 +53,7 @@ int main(int argc, char** argv)
     Mat output_frame; //thread output matrix
 
     pthread_t thread[thread_count+1];
-    int ret_val[thread_count+1];
+    // int ret_val[thread_count+1];
     setupBarrier(thread_count+1, &allocatebarrier);
     setupBarrier(thread_count+1, &displaybarrier);
 
@@ -58,9 +71,10 @@ int main(int argc, char** argv)
                 .n=thread_count,
                 .allocated_frame=&allocated_frame,
                 .output_frame=&output_frame,
-                .cap=&cap
+                .cap=&cap,
+                .debug_code=debug_code
             };
-            ret_val[i] = pthread_create(&thread[i], NULL, displayThread, (void *)&da);
+            pthread_create(&thread[i], NULL, displayThread, (void *)&da);
         }
         else if(i < thread_count)
         {
@@ -70,7 +84,7 @@ int main(int argc, char** argv)
             sa->allocated_frame=&allocated_frame;
             sa->output_frame=&output_frame;
 
-            ret_val[i] = pthread_create(&thread[i], NULL, sobelThread, (void *)sa);
+            pthread_create(&thread[i], NULL, sobelThread, (void *)sa);
         }
     }
 
@@ -80,6 +94,13 @@ int main(int argc, char** argv)
     for (int i=0;i<thread_count+1;i++)
     {
         pthread_join(thread[i],NULL);
+    }
+
+    if(debug_code == 1)
+    {
+        te = clock();
+        double tt = double(te - ts) / double(CLOCKS_PER_SEC);
+        printf("Time Elapsed: %f\n",tt);
     }
 
     cap.release();
@@ -118,8 +139,8 @@ void* sobelThread(void *sobelArgs)
             int cols = frame.cols;
             int col_range = (cols/sa->n);
             emask = Mat(rows, cols, CV_8U, Scalar(0));
-            int col_start = max((col_range*tn), 0);
-            int col_end = min((col_range*(tn+1)),cols);
+            int col_start = max((col_range*tn)-1, 0);
+            int col_end = min((col_range*(tn+1))+2,cols);
             for(int r=0;r<rows-1;r++)
             { 
                 for(int c=col_start;c<col_end-1;c++)
@@ -131,19 +152,24 @@ void* sobelThread(void *sobelArgs)
         //exit if empty frame
         if (frame.empty())
         {
-            if(!tn) printf("TH%i: frame empty. exiting\n",tn);
+            printf("TH%i: frame empty. exiting\n",tn);
             return 0;
         }
         //process grayscale
         Mat gs = to442_grayscale(frame,sa->i,sa->n);
         //process sobel
         Mat sob = to442_sobel(gs, sa->i, sa->n);
-        // printf("TH%i: waiting for display\n",tn);
+
         pthread_barrier_wait(&displaybarrier);
         //wait for previous frame to be output before copying
-        pthread_mutex_lock(&mutex);
-        add(sob,*sa->output_frame,*sa->output_frame);
-        pthread_mutex_unlock(&mutex);
+
+        //removed pthread in interest of emask, no race condition as far as i
+        //know since they are operating on different sections of memory
+        //pthread_mutex_lock(&mutex);
+        //could be benefitial to mask this later on for better mem performance
+        add(sob,*sa->output_frame,*sa->output_frame,emask);
+        //pthread_mutex_unlock(&mutex);
+
         //loop
         itr += 1;
     }
@@ -159,7 +185,7 @@ void* displayThread(void *displayArgs)
     {
     //allocate frame
     *da->cap >> *da->allocated_frame;
-    printf("DIS: Allocating...\n");
+    // printf("DIS: Allocating...\n");
 
     //alocate empty output
 
@@ -167,9 +193,8 @@ void* displayThread(void *displayArgs)
     //exit if empty frame
     if((*da->allocated_frame).empty()) return 0;
     
-    if(itr == 0)
+    else if(itr == 0)
     {
-        // printf("DIS: Initializing Masks...\n");
         cols = (*da->allocated_frame).cols;
         rows = (*da->allocated_frame).rows;
         Mat newout (rows, cols, CV_8U, Scalar(0));
@@ -177,27 +202,30 @@ void* displayThread(void *displayArgs)
         (*da->output_frame) = Scalar(0);
         pthread_barrier_wait(&displaybarrier);
     }
-    if (itr != 0)
+    else if (itr != 0)
     {
         //skip if frame 0
         //wait for frames to be done with sobel
         //copy and recombine previous sobel images
         Mat sout(rows, cols, CV_8U, Scalar(0));;
 
-        pthread_mutex_lock(&mutex);
+        //pthread_mutex_lock(&mutex);
         (*da->output_frame).copyTo(sout);
-        pthread_mutex_unlock(&mutex);
+        //pthread_mutex_unlock(&mutex);
 
-        imshow("Sobel Output",sout);
-        waitKey(0);
+        if(da->debug_code == 0)
+        {
+            imshow("Sobel Output",sout);
+            waitKey(1); // needed for proper display
+        }
+
+        //clean output frame before continuing
         (*da->output_frame) = Scalar(0);
-        // printf("DIS: Waiting on display\n");
-        pthread_barrier_wait(&displaybarrier);
-        //diplay sobel image
-    }
-    
-    //global barrier
 
+        pthread_barrier_wait(&displaybarrier); 
+        // once output frame is cleared threads can write again
+
+    }
     itr += 1;
     //loop
     }
