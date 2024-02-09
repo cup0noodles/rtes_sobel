@@ -13,6 +13,12 @@
  *  Added support for videos
  *  Implimented grayscale and sobel
  *  Video Demo: https://youtu.be/28PkBCEMIcQ
+ * 
+ * Rev 3 - 2/9/24
+ *  Lab 4
+ *  Added variable multithreading support with
+ *  shared memory
+ *  Video Demo: 
 *********************************************/
 #include "imgview.hpp"
 #include "sobel.hpp"
@@ -58,14 +64,13 @@ int main(int argc, char** argv)
         }
         else if(i < thread_count)
         {
-            struct sobelArgs sa = 
-            {
-                .i=i,
-                .n=thread_count,
-                .allocated_frame=&allocated_frame,
-                .output_frame=&output_frame
-            };
-            ret_val[i] = pthread_create(&thread[i], NULL, sobelThread, (void *)&sa);
+            struct sobelArgs *sa = (struct sobelArgs*)malloc(sizeof(struct sobelArgs));
+            sa->i=i;
+            sa->n=thread_count;
+            sa->allocated_frame=&allocated_frame;
+            sa->output_frame=&output_frame;
+
+            ret_val[i] = pthread_create(&thread[i], NULL, sobelThread, (void *)sa);
         }
     }
 
@@ -137,7 +142,7 @@ void* sobelThread(void *sobelArgs)
         pthread_barrier_wait(&displaybarrier);
         //wait for previous frame to be output before copying
         pthread_mutex_lock(&mutex);
-        add(sob,*sa->output_frame,*sa->output_frame, emask);
+        add(sob,*sa->output_frame,*sa->output_frame);
         pthread_mutex_unlock(&mutex);
         //loop
         itr += 1;
