@@ -23,6 +23,8 @@
  *  is not dependant on X11.
  *  Video Demo: 
 *********************************************/
+#include <time.h>
+
 #include "imgview.hpp"
 #include "sobel.hpp"
 
@@ -41,7 +43,7 @@ int main(int argc, char** argv)
         ts = clock();
     }
     
-    VideoCapture cap(file_path); 
+    VideoCapture cap(0); 
     //check that video was actually opened
     if(!cap.isOpened())
     {
@@ -145,7 +147,8 @@ void* sobelThread(void *sobelArgs)
             { 
                 for(int c=col_start;c<col_end-1;c++)
                 {
-                    *emask.ptr(r,c) = 255;
+                    unsigned char *p_mask = emask.ptr(r,c);
+                    p_mask[0] = 255;
                 }
             }
         }
@@ -163,12 +166,12 @@ void* sobelThread(void *sobelArgs)
         pthread_barrier_wait(&displaybarrier);
         //wait for previous frame to be output before copying
 
-        //removed pthread in interest of emask, no race condition as far as i
-        //know since they are operating on different sections of memory
-        //pthread_mutex_lock(&mutex);
+        pthread_mutex_lock(&mutex);
         //could be benefitial to mask this later on for better mem performance
-        add(sob,*sa->output_frame,*sa->output_frame,emask);
-        //pthread_mutex_unlock(&mutex);
+
+        emask.copyTo(*sa->output_frame);
+        //add(sob,*sa->output_frame,*sa->output_frame,emask);
+        pthread_mutex_unlock(&mutex);
 
         //loop
         itr += 1;
@@ -181,6 +184,9 @@ void* displayThread(void *displayArgs)
     int itr = 0;
     int cols, rows;
     Mat masks[da->n];
+    struct timespec start, end;
+    uint64_t diff;
+
     while(1)
     {
     //allocate frame
@@ -200,27 +206,28 @@ void* displayThread(void *displayArgs)
         Mat newout (rows, cols, CV_8U, Scalar(0));
         newout.copyTo(*da->output_frame);
         (*da->output_frame) = Scalar(0);
+        clock_gettime(CLOCK_MONOTONIC, &start);	/* mark start time */
         pthread_barrier_wait(&displaybarrier);
     }
     else if (itr != 0)
     {
         //skip if frame 0
         //wait for frames to be done with sobel
-        //copy and recombine previous sobel images
-        Mat sout(rows, cols, CV_8U, Scalar(0));;
-
-        //pthread_mutex_lock(&mutex);
-        (*da->output_frame).copyTo(sout);
-        //pthread_mutex_unlock(&mutex);
 
         if(da->debug_code == 0)
         {
-            imshow("Sobel Output",sout);
+            imshow("Sobel Output",*da->output_frame);
             waitKey(1); // needed for proper display
         }
 
         //clean output frame before continuing
         (*da->output_frame) = Scalar(0);
+       
+        clock_gettime(CLOCK_MONOTONIC, &end);	/* mark start time */
+        diff = 1000000000L * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec);
+        printf("frame time: %lu ms\r",diff/1000000);
+        fflush(stdout);
+        start = end;
 
         pthread_barrier_wait(&displaybarrier); 
         // once output frame is cleared threads can write again
