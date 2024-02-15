@@ -43,7 +43,7 @@ int main(int argc, char** argv)
         ts = clock();
     }
     
-    VideoCapture cap(0); 
+    VideoCapture cap(file_path); 
     //check that video was actually opened
     if(!cap.isOpened())
     {
@@ -126,6 +126,7 @@ void* sobelThread(void *sobelArgs)
     printf("TH%u: entered\n",tn);
     //generate mask
     int itr = 0;
+    Mat emask;
     while(1)
     {
         //wait for global to allocate
@@ -134,7 +135,6 @@ void* sobelThread(void *sobelArgs)
         //grab frame from allocated_frame
 
         Mat frame = *sa->allocated_frame;
-        Mat emask;
         if (itr == 0)
         {
             int rows = frame.rows;
@@ -143,9 +143,9 @@ void* sobelThread(void *sobelArgs)
             emask = Mat(rows, cols, CV_8U, Scalar(0));
             int col_start = max((col_range*tn)-1, 0);
             int col_end = min((col_range*(tn+1))+2,cols);
-            for(int r=0;r<rows-1;r++)
+            for(int r=0;r<rows;r++)
             { 
-                for(int c=col_start;c<col_end-1;c++)
+                for(int c=col_start;c<col_end;c++)
                 {
                     unsigned char *p_mask = emask.ptr(r,c);
                     p_mask[0] = 255;
@@ -169,7 +169,7 @@ void* sobelThread(void *sobelArgs)
         pthread_mutex_lock(&mutex);
         //could be benefitial to mask this later on for better mem performance
 
-        emask.copyTo(*sa->output_frame);
+        sob.copyTo(*sa->output_frame,emask);
         //add(sob,*sa->output_frame,*sa->output_frame,emask);
         pthread_mutex_unlock(&mutex);
 
@@ -221,7 +221,7 @@ void* displayThread(void *displayArgs)
         }
 
         //clean output frame before continuing
-        (*da->output_frame) = Scalar(0);
+        //(*da->output_frame) = Scalar(0);
        
         clock_gettime(CLOCK_MONOTONIC, &end);	/* mark start time */
         diff = 1000000000L * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec);
