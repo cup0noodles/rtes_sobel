@@ -43,7 +43,7 @@ int main(int argc, char** argv)
         ts = clock();
     }
     
-    VideoCapture cap(0); 
+    VideoCapture cap(file_path); 
     //check that video was actually opened
     if(!cap.isOpened())
     {
@@ -126,7 +126,7 @@ void* sobelThread(void *sobelArgs)
     printf("TH%u: entered\n",tn);
     //generate mask
     int itr = 0;
-    Mat emask;
+    Mat emask, frame, gs, sob;
     while(1)
     {
         //wait for global to allocate
@@ -134,7 +134,7 @@ void* sobelThread(void *sobelArgs)
         pthread_barrier_wait(&allocatebarrier);
         //grab frame from allocated_frame
 
-        Mat frame = *sa->allocated_frame;
+        frame = *sa->allocated_frame;
         if (itr == 0)
         {
             int rows = frame.rows;
@@ -159,18 +159,16 @@ void* sobelThread(void *sobelArgs)
             return 0;
         }
         //process grayscale
-        Mat gs = to442_grayscale(frame,sa->i,sa->n);
+        gs = to442_grayscale(frame,sa->i,sa->n);
         //process sobel
-        Mat sob = to442_sobel(gs, sa->i, sa->n);
+        sob = to442_sobel(gs, sa->i, sa->n);
 
         pthread_barrier_wait(&displaybarrier);
         //wait for previous frame to be output before copying
 
         pthread_mutex_lock(&mutex);
         //could be benefitial to mask this later on for better mem performance
-
         sob.copyTo(*sa->output_frame,emask);
-        //add(sob,*sa->output_frame,*sa->output_frame,emask);
         pthread_mutex_unlock(&mutex);
 
         //loop

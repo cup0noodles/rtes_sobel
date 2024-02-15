@@ -15,8 +15,16 @@ using namespace cv;
 #ifndef SOBEL_HEADER_H
 #define SOBEL_HEADER_H
 
+struct range
+{
+    int begin;
+    int end;
+};
+
 Mat to442_grayscale(Mat rgb_frame, int i=0, int n=1);
 
 Mat to442_sobel(Mat frame, int i=0, int n=1);
+
+struct range* generateRange();
 
 #endif
