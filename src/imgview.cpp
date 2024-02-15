@@ -43,7 +43,7 @@ int main(int argc, char** argv)
         ts = clock();
     }
     
-    VideoCapture cap(file_path); 
+    VideoCapture cap(0); 
     //check that video was actually opened
     if(!cap.isOpened())
     {
@@ -141,8 +141,8 @@ void* sobelThread(void *sobelArgs)
             int cols = frame.cols;
             int col_range = (cols/sa->n);
             emask = Mat(rows, cols, CV_8U, Scalar(0));
-            int col_start = max((col_range*tn)-1, 0);
-            int col_end = min((col_range*(tn+1))+2,cols);
+            int col_start = max((col_range*tn), 0);
+            int col_end = min((col_range*(tn+1)),cols);
             for(int r=0;r<rows;r++)
             { 
                 for(int c=col_start;c<col_end;c++)
