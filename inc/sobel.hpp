@@ -8,7 +8,9 @@
  * Video Demo: https://youtu.be/28PkBCEMIcQ
 *********************************************/
 #include <iostream>
+#include <arm_neon.h>
 #include <opencv2/opencv.hpp>
+#include <math.h>
 
 using namespace cv;
 

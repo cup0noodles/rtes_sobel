@@ -23,8 +23,6 @@
  *  is not dependant on X11.
  *  Video Demo: 
 *********************************************/
-#include <time.h>
-
 #include "imgview.hpp"
 #include "sobel.hpp"
 
@@ -139,13 +137,13 @@ void* sobelThread(void *sobelArgs)
         {
             int rows = frame.rows;
             int cols = frame.cols;
-            int col_range = (cols/sa->n);
+            int range = (rows/sa->n);
             emask = Mat(rows, cols, CV_8U, Scalar(0));
-            int col_start = max((col_range*tn), 0);
-            int col_end = min((col_range*(tn+1)),cols);
-            for(int r=0;r<rows;r++)
+            int start = max((range*tn), 0);
+            int end = min((range*(tn+1)),rows);
+            for(int r=start;r<end-1;r++)
             { 
-                for(int c=col_start;c<col_end;c++)
+                for(int c=0;c<cols-1;c++)
                 {
                     unsigned char *p_mask = emask.ptr(r,c);
                     p_mask[0] = 255;
@@ -183,6 +181,14 @@ void* displayThread(void *displayArgs)
     int cols, rows;
     Mat masks[da->n];
     struct timespec start, end;
+    struct avgft
+    {
+        uint64_t avg;
+        uint64_t n;
+    };
+    struct avgft *aft = (struct avgft *)malloc(sizeof(struct avgft));
+    aft->avg = 0;
+    aft->n = 0;
     uint64_t diff;
 
     while(1)
@@ -223,7 +229,9 @@ void* displayThread(void *displayArgs)
        
         clock_gettime(CLOCK_MONOTONIC, &end);	/* mark start time */
         diff = 1000000000L * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec);
-        printf("frame time: %lu ms\r",diff/1000000);
+        aft->n += 1;
+        aft->avg = (aft->avg / (aft->n - 1)*100)/100 + (1/aft->n*100 * diff)/100;
+        printf("avg frame time: %lu ms    \r",diff/1000000);
         fflush(stdout);
         start = end;
 
