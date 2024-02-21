@@ -63,6 +63,8 @@ Mat to442_sobel(Mat frame, int i, int n)
     int end = min(range*(i+1)+2,rows);
 
     Mat sobel_frame(rows, cols, CV_8U, Scalar(0));
+
+    int16x8_t two_v = vdupq_n_s16(2);
     // init 0 so no issues with edges
 
     //tighted bounds by 1 since filter reaches outwards
@@ -70,23 +72,69 @@ Mat to442_sobel(Mat frame, int i, int n)
     //Equation is 
     // |G| = |(P1 + 2*P2 + P3) - (P7 + 2*P8 + P9)|
     //      +|(P3 + 2*P6 + P9) - (P1 + 2*P4 + P7)|
-    for(int r=start;r<end-1;r++)
+    for(int r=start+1;r<end-2;r++)
     {
-        for(int c=0;c<cols-1;c++)
+        for(int c=1;c<cols-2;c=c+8)
         {
-            unsigned char p[9];
-            // build matrix of surrounding pixels
-            for(int i=0;i<3;i++)
+            uint8x8_t s_out;
+            int16x8_t s[9];
+
+            int16x8_t acc0;
+            int16x8_t acc1;
+            int16x8_t outtemp;
+            int16x8_t outtemp2;
+            unsigned char *s_p = sobel_frame.ptr(r,c);
+            // grab 8 across of pixels
+            // 8, 3x3s, move 8 each time
+            //calculate 6 at a time
+
+            //get start to each row
+            for (int i=0;i<3;i++)
             {
-                for(int j=0;j<3;j++)
+                for( int j=0; j<3;j++)
                 {
-                    p[i*3+j] = *frame.ptr(r-(i-1),c-(j-1));
+                    s[i] = vmovl_s8(vreinterpret_s8_u8(vld1_u8(frame.ptr(r-1+i,c-1+j))));
                 }
             }
-            unsigned char *s_p = sobel_frame.ptr(r,c);
+
+            //2*p1
+            acc0 = vmulq_s16(two_v, s[1]);
+            //+p[0]
+            acc0 = vaddq_s16(acc0, s[0]);
+            //+p[2]
+            acc0 = vaddq_s16(acc0, s[2]);
+            
+            //2*p7
+            acc1 = vmulq_s16(two_v, s[7]);
+            //+p6
+            acc1 = vaddq_s16(acc1, s[6]);
+            //+p8
+            acc1 = vaddq_s16(acc1, s[8]);
+            
+            outtemp = vabdq_s16(acc0, acc1);
+
+
+            //2*p5
+            acc0 = vmulq_s16(two_v, s[5]);
+            //+p2
+            acc0 = vaddq_s16(acc0, s[2]);
+            //+p8
+            acc0 = vaddq_s16(acc0, s[8]);
+            
+            //2*0
+            acc1 = vmulq_s16(two_v, s[3]);
+            //+p4
+            acc1 = vaddq_s16(acc1, s[0]);
+            //+p6
+            acc1 = vaddq_s16(acc1, s[6]);
+            
+            outtemp2 = vabdq_s16(acc0, acc1);
+
+            outtemp = vaddq_s16(outtemp, outtemp2); //outtemp has 8 output pixels
+
             //peform convolution/addition
-            s_p[0] = abs((p[0] + 2*p[1] + p[2]) - (p[6] + 2*p[7] + p[8])) \
-                   + abs((p[2] + 2*p[5] + p[8]) - (p[0] + 2*p[3] + p[6]));
+            s_out = vreinterpret_u8_s8(vmovn_s16(outtemp));
+            vst1_u8(s_p, s_out);
 
         }
     }
