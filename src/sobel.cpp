@@ -27,10 +27,10 @@ Mat to442_grayscale(Mat rgb_frame, int i, int n)
     uint8x8_t RED_F = vdup_n_u8(54);
     uint8x8_t GREEN_F = vdup_n_u8(183);
 
-    for(int r=start;r<end-1;r++)
+    for(int r=start;r<end;r++)
     {
         
-        for(int c=0;c<cols-1;c=c+8)
+        for(int c=0;c<cols;c=c+8)
         {
             unsigned char *p_rgb = rgb_frame.ptr(r, c); //BRG format
             unsigned char *p_gray = graymat.ptr(r, c);
@@ -69,12 +69,10 @@ Mat to442_sobel(Mat frame, int i, int n)
 
     //tighted bounds by 1 since filter reaches outwards
     //using simplified |G| = |Gx| + |Gy|
-    //Equation is 
-    // |G| = |(P1 + 2*P2 + P3) - (P7 + 2*P8 + P9)|
-    //      +|(P3 + 2*P6 + P9) - (P1 + 2*P4 + P7)|
-    for(int r=start+1;r<end-2;r++)
+   
+    for(int r=start+1;r<end-1;r++)
     {
-        for(int c=1;c<cols-2;c=c+8)
+        for(int c=1;c<cols-1;c=c+8)
         {
             uint8x8_t s_out;
             int16x8_t s[9];
@@ -93,13 +91,23 @@ Mat to442_sobel(Mat frame, int i, int n)
             {
                 for( int j=0; j<3;j++)
                 {
-                    s[i] = vmovl_s8(vreinterpret_s8_u8(vld1_u8(frame.ptr(r-1+i,c-1+j))));
+                    uint8x8_t p = vld1_u8(frame.ptr(r+(i-1),c+(j-1)));
+                    s[i*3+j] = vreinterpretq_s16_u16(vmovl_u8(p));
                 }
             }
 
+            //Equation is 
+            // |G| = |(P1 + 2*P2 + P3) - (P7 + 2*P8 + P9)|
+            //      +|(P3 + 2*P6 + P9) - (P1 + 2*P4 + P7)|
+            
+            acc0 = vdupq_n_s16(0);
+            acc1 = vdupq_n_s16(0);
+            outtemp = vdupq_n_s16(0);
+            outtemp2 = vdupq_n_s16(0);
+
             //2*p1
             acc0 = vmulq_s16(two_v, s[1]);
-            //+p[0]
+            //+p0
             acc0 = vaddq_s16(acc0, s[0]);
             //+p[2]
             acc0 = vaddq_s16(acc0, s[2]);
@@ -111,29 +119,35 @@ Mat to442_sobel(Mat frame, int i, int n)
             //+p8
             acc1 = vaddq_s16(acc1, s[8]);
             
-            outtemp = vabdq_s16(acc0, acc1);
+            outtemp = vabdq_s16(acc1, acc0);
 
-
+            acc0 = vdupq_n_s16(0);
+            acc1 = vdupq_n_s16(0);
             //2*p5
-            acc0 = vmulq_s16(two_v, s[5]);
+            acc0 = vmulq_n_s16(s[5],2);
             //+p2
             acc0 = vaddq_s16(acc0, s[2]);
             //+p8
             acc0 = vaddq_s16(acc0, s[8]);
             
             //2*0
-            acc1 = vmulq_s16(two_v, s[3]);
+            acc1 = vmulq_n_s16(s[3],2);
             //+p4
             acc1 = vaddq_s16(acc1, s[0]);
             //+p6
             acc1 = vaddq_s16(acc1, s[6]);
             
-            outtemp2 = vabdq_s16(acc0, acc1);
+            outtemp2 = vsubq_s16(acc1, acc0);
+           
+            outtemp2 = vabsq_s16(outtemp2);
+            outtemp = vabsq_s16(outtemp);
 
             outtemp = vaddq_s16(outtemp, outtemp2); //outtemp has 8 output pixels
 
             //peform convolution/addition
-            s_out = vreinterpret_u8_s8(vmovn_s16(outtemp));
+
+            uint16x8_t s_unsigned = vreinterpretq_u16_s16(outtemp);
+            s_out = vmovn_u16(s_unsigned);
             vst1_u8(s_p, s_out);
 
         }

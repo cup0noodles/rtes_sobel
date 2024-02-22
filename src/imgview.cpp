@@ -22,6 +22,11 @@
  *  to switch to better performance measure that
  *  is not dependant on X11.
  *  Video Demo: 
+ * 
+ * Rev 4 - 2/22/24
+ *  Lab 5
+ *  Added Neon intrensic implimentation
+ *  Demo: https://youtu.be/0g-B8gFEqrU
 *********************************************/
 #include "imgview.hpp"
 #include "sobel.hpp"
@@ -140,7 +145,7 @@ void* sobelThread(void *sobelArgs)
             int range = (rows/sa->n);
             emask = Mat(rows, cols, CV_8U, Scalar(0));
             int start = max((range*tn), 0);
-            int end = min((range*(tn+1)),rows);
+            int end = min((range*(tn+1))+1,rows);
             for(int r=start;r<end-1;r++)
             { 
                 for(int c=0;c<cols-1;c++)
@@ -159,6 +164,7 @@ void* sobelThread(void *sobelArgs)
         //process grayscale
         gs = to442_grayscale(frame,sa->i,sa->n);
         //process sobel
+        // sob = gs;
         sob = to442_sobel(gs, sa->i, sa->n);
 
         pthread_barrier_wait(&displaybarrier);
