@@ -4,7 +4,7 @@
 
 CC = g++
 LIBS = -lpcap -lpthread
-CFLAGS = -g -Wall -mcpu=cortex-a72 -std=c++11 -O0 -Iinc/ -I/usr/include/opencv4/ `pkg-config --libs opencv4`
+CFLAGS = -g -Wall -o0 -Iinc/ -I/usr/include/opencv4/ `pkg-config --libs opencv4`
 SRCS = $(wildcard src/*.cpp)
 #CFLAGS = -g
 
