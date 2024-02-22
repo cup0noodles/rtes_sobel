@@ -43,7 +43,7 @@ int main(int argc, char** argv)
         ts = clock();
     }
     
-    VideoCapture cap(0); 
+    VideoCapture cap(file_path); 
     //check that video was actually opened
     if(!cap.isOpened())
     {
