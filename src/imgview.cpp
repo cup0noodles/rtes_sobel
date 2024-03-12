@@ -226,8 +226,12 @@ void* displayThread(void *displayArgs)
 
         if(da->debug_code == 0)
         {
-            // imshow("Sobel Output",*da->output_frame);
-            // waitKey(1); // needed for proper display
+            imshow("Sobel Output",*da->output_frame);
+            waitKey(1); // needed for proper display
+           
+        }
+        else if(da->debug_code == 2)
+        {
             if((*da->output_frame).elemSize() > 0)
             {
                 std::string out((char*)(*da->output_frame).data, (*da->output_frame).total() * (*da->output_frame).elemSize());
