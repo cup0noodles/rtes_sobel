@@ -23,3 +23,13 @@ There are two primary test files used - video1 and RoTS-Opening. video1 is relat
 ## Lab 4 - Multithreading
 - Implimentation of variable multithreading.
 - Implimentation of time based performance metric to better quantify improvements.
+
+## Lab 6 - FFMPEG
+Command to stream video, no processing
+```bash
+ffmpeg -re -i video1-crop.mp4 -vcodec h264 -crf 45 -f mpegts 'udp://10.8.0.6:1234?ttl=13'
+```
+Command to stream video from imgview
+```bash
+./imgview video1-crop.mp4 4 | ffmpeg -re -f rawvideo -s 800x600 -pix_fmt gray -hwaccel vulkan -i - -c copy -vcodec h264 -crf 42 -f mpegts 'udp://10.8.0.6:1234?ttl=13' 
+```
